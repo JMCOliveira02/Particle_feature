@@ -95,8 +95,8 @@ void KeypointDetector::publishTransformedFeatures(const geometry_msgs::msg::Tran
         feature_msg.x = transformed_point.x;
         feature_msg.y = transformed_point.y;
 
-        RCLCPP_INFO(get_logger(), "Transformed noisy point: (%.3f, %.3f, %.3f)", transformed_point.x, transformed_point.y, transformed_point.z);
-        // ------------------------------------ POSITION
+        // RCLCPP_INFO(get_logger(), "Transformed noisy point: (%.3f, %.3f, %.3f)", transformed_point.x, transformed_point.y, transformed_point.z);
+        //  ------------------------------------ POSITION
 
         //
         // ORIENTATION ------------------------------------
@@ -119,7 +119,7 @@ void KeypointDetector::publishTransformedFeatures(const geometry_msgs::msg::Tran
 
         feature_msg.theta = yaw;
 
-        RCLCPP_INFO(this->get_logger(), "Angle of feature %i: %.3f", i, yaw);
+        // RCLCPP_INFO(this->get_logger(), "Angle of feature %i: %.3f", i, yaw);
 
         // ------------------------------------ ORIENTATION
 
@@ -133,6 +133,8 @@ void KeypointDetector::publishTransformedFeatures(const geometry_msgs::msg::Tran
         feature_msg.type = feature_map->type;
 
         feature_msg.confidence = 0.95;
+
+        feature_array_msg.header.stamp = this->get_clock()->now();
 
         feature_array_msg.features.push_back(feature_msg);
 
