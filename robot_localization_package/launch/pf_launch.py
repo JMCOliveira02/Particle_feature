@@ -28,6 +28,8 @@ def generate_launch_description():
         worlds_dir, 'maps', world_setup, world_setup + '.pgm')
     map_features = os.path.join(
         worlds_dir, 'feature_maps', world_setup + '.yaml')
+    map_features_detection = os.path.join(
+        worlds_dir, 'feature_maps', world_setup + '_detection' + '.yaml')
     rviz_config = os.path.join(worlds_dir, 'rviz', 'corners_orientation.rviz')
 
     # Webots
@@ -46,7 +48,7 @@ def generate_launch_description():
         name='fake_detector',
         output='screen',
         parameters=[
-            {"map_features": map_features},
+            {"map_features": map_features_detection},
         ]
 
     )
@@ -158,9 +160,9 @@ def generate_launch_description():
         rviz,
         webots,
         robot_controller,
-        #fake_detector,
+        fake_detector,
         # path_tracker,
-        corner_detector,
+        #corner_detector,
         particle_filter,
         # send_scan,
         # recv_results,

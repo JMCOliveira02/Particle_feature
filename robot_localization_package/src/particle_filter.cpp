@@ -864,12 +864,12 @@ void ParticleFilter::measurementUpdate(const robot_msgs::msg::FeatureArray::Shar
             likelihood += computeLikelihoodFeature(p, obs.x, obs.y, obs.theta, sigma_pos, sigma_theta, obs.type);
         }
 
-        p.weight *= likelihood;
+        p.weight += likelihood;
 
         bool penalize = !isParticleInFreeSpace(p.x, p.y, pgm, resolution, origin);
         if (penalize)
         {
-            p.weight = p.weight / 2;
+            p.weight = p.weight / 4;
         }
         else
         {
