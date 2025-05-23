@@ -407,7 +407,7 @@ void ParticleFilter::injectRandomParticles_pgm(double percentage)
 void ParticleFilter::storeMapMessage(const robot_msgs::msg::FeatureArray::SharedPtr msg)
 {
     last_map_msg_ = msg;
-    RCLCPP_INFO(this->get_logger(), "Received features");
+    //RCLCPP_INFO(this->get_logger(), "Received features");
     new_map = true;
 }
 
@@ -489,10 +489,10 @@ double ParticleFilter::computeAngleLikelihood(double measured_angle, double expe
     while (error < -M_PI)
         error += 2 * M_PI;
 
-    double coeff = 1.0 / std::sqrt(2.0 * M_PI * sigma * sigma);
+    //double coeff = 1.0 / std::sqrt(2.0 * M_PI * sigma * sigma);
     double exponent = -0.5 * (error * error) / (sigma * sigma);
 
-    return coeff * std::exp(exponent);
+    return std::exp(exponent);
 }
 
 // compute the likelihood of a corner feature based on distance and angle
@@ -518,11 +518,11 @@ double ParticleFilter::computeLikelihoodFeature(const Particle &p, double noisy_
     // Compute likelihood based on distance and angle
     double expected_feature_angle = transformAngleToParticleFrame(best_feature.theta, p.theta);
     double angle_likelihood = computeAngleLikelihood(measured_theta, expected_feature_angle, sigma_theta);
-    double distance_likelihood = (std::exp(-(min_dist * min_dist) / (2 * sigma_pos * sigma_pos))) / std::sqrt(2 * M_PI * sigma_pos * sigma_pos);
+    double distance_likelihood = (std::exp(-(min_dist * min_dist) / (2 * sigma_pos * sigma_pos)));
 
     if (with_angle_)
     {
-        likelihood = (angle_likelihood + distance_likelihood);
+        likelihood = (angle_likelihood * distance_likelihood);
     }
     else
     {
@@ -548,7 +548,7 @@ ParticleFilter::DecodedMsg ParticleFilter::decodeMsg(const robot_msgs::msg::Feat
     {
         for (size_t j = 0; j < 2; ++j)
         {
-            feature.covariance_pos[i][j] = msg.position_covariance[i * 3 + j];
+            feature.covariance_pos[i][j] = msg.position_covariance[i * 2 + j];
         }
     }
 
@@ -862,7 +862,7 @@ void ParticleFilter::measurementUpdate(const robot_msgs::msg::FeatureArray::Shar
             likelihood += computeLikelihoodFeature(p, obs.x, obs.y, obs.theta, sigma_pos, sigma_theta, obs.type);
         }
 
-        p.weight += likelihood;
+        p.weight *= likelihood;
 
         bool penalize = !isParticleInFreeSpace(p.x, p.y, pgm, resolution, origin);
         if (penalize)
@@ -883,7 +883,7 @@ void ParticleFilter::measurementUpdate(const robot_msgs::msg::FeatureArray::Shar
     }
     else
     {
-        RCLCPP_INFO(this->get_logger(), "Not all particles are outside the free space.");
+        //RCLCPP_INFO(this->get_logger(), "Not all particles are outside the free space.");
         normalizeWeights();
     }
 
@@ -915,21 +915,21 @@ void ParticleFilter::resampleParticles(ResamplingAmount type, ResamplingMethod m
                                        [](double sum, const Particle &p)
                                        { return sum + (p.weight * p.weight); });
 
-    RCLCPP_INFO(this->get_logger(), "Max weight: %f, ESS: %f", max_weight, ess);
+    //RCLCPP_INFO(this->get_logger(), "Max weight: %f, ESS: %f", max_weight, ess);
 
     switch (type)
     {
     case ResamplingAmount::ESS:
         if (ess > num_particles_ * resample_ess_threshold_)
         {
-            RCLCPP_INFO(this->get_logger(), "Skipping resampling, particles are well-distributed.");
+            //RCLCPP_INFO(this->get_logger(), "Skipping resampling, particles are well-distributed.");
             return;
         }
         break;
     case ResamplingAmount::MAX_WEIGHT:
         if (max_weight < resample_max_weight_threshold_ / num_particles_)
         {
-            RCLCPP_INFO(this->get_logger(), "Skipping resampling, max weight is high.");
+            //RCLCPP_INFO(this->get_logger(), "Skipping resampling, max weight is not high enough.");
             return;
         }
         break;
