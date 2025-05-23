@@ -81,7 +81,12 @@ def generate_launch_description():
     )
 
     # Particle filter
-    particle_filter_config_file = "/home/joao/ros_ws/src/robot_localization_package/config/particle_filter_params.yaml"
+    particle_filter_config_file = os.path.join(
+        get_package_share_directory('robot_localization_package'),
+        'config',
+        'particle_filter_params.yaml'
+    )
+
     particle_filter = Node(
         package='robot_localization_package',
         executable='particle_filter',
@@ -158,9 +163,9 @@ def generate_launch_description():
         rviz,
         webots,
         robot_controller,
-        #fake_detector,
+        fake_detector,
         # path_tracker,
-        corner_detector,
+        # corner_detector,
         particle_filter,
         # send_scan,
         # recv_results,
