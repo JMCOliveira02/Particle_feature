@@ -524,7 +524,7 @@ double ParticleFilter::computeLikelihoodFeature(const Particle &p, double noisy_
 
     if (with_angle_)
     {
-        likelihood = (angle_likelihood + distance_likelihood);
+        likelihood = (angle_likelihood * distance_likelihood);
     }
     else
     {
