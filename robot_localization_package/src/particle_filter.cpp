@@ -96,14 +96,14 @@ ParticleFilter::ParticleFilter() : Node("particle_filter"),
     map_loader_.loadToGlobalMap(map_features_);
     global_features_ = map_loader_.getGlobalFeatureMap();
 
+    odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
+        "/odom", 10,
+        std::bind(&ParticleFilter::motionUpdate, this, std::placeholders::_1));
+
     // Subscribe to the features observed by the robot and odometry topics
     feature_sub_ = this->create_subscription<robot_msgs::msg::FeatureArray>(
         "/features", 10,
         std::bind(&ParticleFilter::storeMapMessage, this, std::placeholders::_1));
-
-    odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-        "/odom", 10,
-        std::bind(&ParticleFilter::motionUpdate, this, std::placeholders::_1));
 
     // Create publishers for the estimated pose and particles
     pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("/estimated_pose", 10);
@@ -406,9 +406,11 @@ void ParticleFilter::injectRandomParticles_pgm(double percentage)
 // store the map message received from the topic
 void ParticleFilter::storeMapMessage(const robot_msgs::msg::FeatureArray::SharedPtr msg)
 {
+    // lets save the timestamp
+
     last_map_msg_ = msg;
-    //RCLCPP_INFO(this->get_logger(), "Received features");
-    new_map = true;
+    last_map_msg_timestamp_ = rclcpp::Time(msg->header.stamp, this->get_clock()->get_clock_type());
+    RCLCPP_INFO(this->get_logger(), "Received features");
 }
 
 std::vector<map_features::Feature> ParticleFilter::getExpectedFeatures(const Particle &p, const std::string &type)
@@ -445,7 +447,7 @@ double ParticleFilter::transformAngleToParticleFrame(double feature_theta_map, d
 {
 
     // print the theta of the feature and the particle
-    RCLCPP_INFO(this->get_logger(), "Feature theta: %.2f, Particle theta: %.2f", feature_theta_map, particle_theta);
+    // RCLCPP_INFO(this->get_logger(), "Feature theta: %.2f, Particle theta: %.2f", feature_theta_map, particle_theta);
 
     if (particle_theta < -M_PI)
         particle_theta += 2 * M_PI;
@@ -489,7 +491,7 @@ double ParticleFilter::computeAngleLikelihood(double measured_angle, double expe
     while (error < -M_PI)
         error += 2 * M_PI;
 
-    //double coeff = 1.0 / std::sqrt(2.0 * M_PI * sigma * sigma);
+    // double coeff = 1.0 / std::sqrt(2.0 * M_PI * sigma * sigma);
     double exponent = -0.5 * (error * error) / (sigma * sigma);
 
     return std::exp(exponent);
@@ -551,7 +553,6 @@ ParticleFilter::DecodedMsg ParticleFilter::decodeMsg(const robot_msgs::msg::Feat
             feature.covariance_pos[i][j] = msg.position_covariance[i * 2 + j];
         }
     }
-
 
     return feature;
 }
@@ -787,12 +788,6 @@ void ParticleFilter::motionUpdate(const nav_msgs::msg::Odometry::SharedPtr msg)
     // update particles if significant motion is detected
     if (delta_distance > motion_delta_distance_ || std::abs(delta_theta_odom) > motion_delta_angle_)
     {
-        if (!last_map_msg_)
-        {
-            RCLCPP_WARN(this->get_logger(), "No keypoint message available yet.");
-            return;
-        }
-
         for (auto &p : particles_)
         {
             p.x += delta_x_robot * std::cos(p.theta) - delta_y_robot * std::sin(p.theta) + noise_x(generator_);
@@ -809,8 +804,18 @@ void ParticleFilter::motionUpdate(const nav_msgs::msg::Odometry::SharedPtr msg)
         last_y_ = odom_y;
         last_theta_ = odom_theta;
 
+        if (!last_map_msg_)
+        {
+            RCLCPP_WARN(this->get_logger(), "No keypoint message available yet.");
+            return;
+        }
         // update the particles weights
         measurementUpdate(last_map_msg_);
+    }
+    else if (delta_distance < motion_delta_distance_ / 2 || std::abs(delta_theta_odom) < motion_delta_angle_ / 2)
+    {
+        // Save the timestamp of this motion update
+        last_motion_update_timestamp_ = this->get_clock()->now();
     }
 
     publishParticles();
@@ -824,11 +829,17 @@ void ParticleFilter::measurementUpdate(const robot_msgs::msg::FeatureArray::Shar
         return;
     }
 
-    if (!new_map)
+    if (last_map_msg_timestamp_ < last_motion_update_timestamp_)
     {
+        // Print the timestamps for debugging
+        RCLCPP_DEBUG(this->get_logger(), "Last map message timestamp: %.2f.%ld",
+                     last_map_msg_timestamp_.seconds(), last_map_msg_timestamp_.nanoseconds());
+        RCLCPP_DEBUG(this->get_logger(), "Last motion update timestamp: %.2f.%ld",
+                     last_motion_update_timestamp_.seconds(), last_motion_update_timestamp_.nanoseconds());
+
+        RCLCPP_WARN(this->get_logger(), "Skipping measurement update: Map message is older than the last motion update.");
         return;
     }
-    new_map = false;
 
     bool all_outside = true;
 
@@ -859,7 +870,7 @@ void ParticleFilter::measurementUpdate(const robot_msgs::msg::FeatureArray::Shar
 
             // Compute likelihood based on feature type
 
-            likelihood += computeLikelihoodFeature(p, obs.x, obs.y, obs.theta, sigma_pos, sigma_theta, obs.type);
+            likelihood += std::pow(computeLikelihoodFeature(p, obs.x, obs.y, obs.theta, sigma_pos, sigma_theta, obs.type), 3);
         }
 
         p.weight *= likelihood;
@@ -883,7 +894,7 @@ void ParticleFilter::measurementUpdate(const robot_msgs::msg::FeatureArray::Shar
     }
     else
     {
-        //RCLCPP_INFO(this->get_logger(), "Not all particles are outside the free space.");
+        // RCLCPP_INFO(this->get_logger(), "Not all particles are outside the free space.");
         normalizeWeights();
     }
 
@@ -894,7 +905,7 @@ void ParticleFilter::measurementUpdate(const robot_msgs::msg::FeatureArray::Shar
     if (!resample_flag_)
     {
         // replaceWorstParticles(replace_worst_percentage_);
-        replaceWorstParticles_pgm(replace_worst_percentage_);
+        // replaceWorstParticles_pgm(replace_worst_percentage_);
     }
     else
     {
@@ -915,21 +926,21 @@ void ParticleFilter::resampleParticles(ResamplingAmount type, ResamplingMethod m
                                        [](double sum, const Particle &p)
                                        { return sum + (p.weight * p.weight); });
 
-    //RCLCPP_INFO(this->get_logger(), "Max weight: %f, ESS: %f", max_weight, ess);
+    // RCLCPP_INFO(this->get_logger(), "Max weight: %f, ESS: %f", max_weight, ess);
 
     switch (type)
     {
     case ResamplingAmount::ESS:
         if (ess > num_particles_ * resample_ess_threshold_)
         {
-            //RCLCPP_INFO(this->get_logger(), "Skipping resampling, particles are well-distributed.");
+            // RCLCPP_INFO(this->get_logger(), "Skipping resampling, particles are well-distributed.");
             return;
         }
         break;
     case ResamplingAmount::MAX_WEIGHT:
         if (max_weight < resample_max_weight_threshold_ / num_particles_)
         {
-            //RCLCPP_INFO(this->get_logger(), "Skipping resampling, max weight is not high enough.");
+            // RCLCPP_INFO(this->get_logger(), "Skipping resampling, max weight is not high enough.");
             return;
         }
         break;

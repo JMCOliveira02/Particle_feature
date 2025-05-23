@@ -21,6 +21,7 @@
 #include <fstream>
 #include <array>
 #include <string>
+#include <cmath>
 
 #define NUM_PARTICLES 100.0
 
@@ -97,11 +98,11 @@ private:
     // Decoded message structure
     struct DecodedMsg
     {
-        double x, y, theta;                                    // Position and orientation
-        std::string type;                                      // Feature type
-        double confidence;                                     // Confidence level of classification
-        std::array<std::array<double, 2>, 2> covariance_pos;   // Position covariance
-        double angle_variance;                                 // Orientation covariance
+        double x, y, theta;                                  // Position and orientation
+        std::string type;                                    // Feature type
+        double confidence;                                   // Confidence level of classification
+        std::array<std::array<double, 2>, 2> covariance_pos; // Position covariance
+        double angle_variance;                               // Orientation covariance
     };
 
     // Resampling methods
@@ -133,7 +134,6 @@ private:
     double num_particles_;
     std::vector<Particle> particles_;
     bool resample_flag_ = false;
-    bool new_map = false;
     double motion_delta_distance_, motion_delta_angle_;
     double motion_x_variance_, motion_y_variance_, motion_angle_variance_;
     double resample_ess_threshold_;
@@ -156,7 +156,13 @@ private:
 
     // Last received messages
     robot_msgs::msg::FeatureArray::SharedPtr last_map_msg_;
+
     nav_msgs::msg::Odometry::SharedPtr msg_odom_base_link_;
+
+    // Timestamp of the last received map message
+    rclcpp::Time last_map_msg_timestamp_;
+    // Timestamp of the last motion update
+    rclcpp::Time last_motion_update_timestamp_;
 
     // Particle filter state
     double iterationCounter = 0.0;
