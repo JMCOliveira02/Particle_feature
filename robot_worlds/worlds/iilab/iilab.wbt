@@ -320,7 +320,7 @@ DEF ROBOT_1 Robot {
       fieldOfView 6.282
       verticalFieldOfView 2.5
       numberOfLayers 1
-      maxRange 3
+      maxRange 10
     }
     DEF BODY Pose {
       rotation 0.5773502691896258 -0.5773502691896258 -0.5773502691896258 2.094395
@@ -556,8 +556,6 @@ DEF ROBOT_1 Robot {
               }
               physics Physics {
               }
-              linearVelocity 1.2948643594362663e-10 -9.419895835232556e-10 9.259572601483383e-08
-              angularVelocity -2.472061503881806e-09 -1.3677967252875792e-09 -1.9742531038319082e-08
             }
           }
           DEF FORK_SHAPE Shape {
@@ -615,8 +613,6 @@ DEF ROBOT_1 Robot {
         }
         physics Physics {
         }
-        linearVelocity 4.349528851279122e-11 -5.028214400167583e-10 4.0526389995566974e-08
-        angularVelocity -2.2115801923951074e-09 -5.271216221975762e-10 -1.9729203611895558e-08
       }
     }
     DEF LEFT_WHEEL HingeJoint {
@@ -800,8 +796,6 @@ DEF ROBOT_1 Robot {
         }
         physics Physics {
         }
-        linearVelocity 2.0680797491202477e-10 1.8476749576369898e-10 3.8156106936845824e-08
-        angularVelocity -8.671201569917839e-10 -1.393008676512807e-09 5.647386091152394e-10
       }
     }
     DEF RIGHT_WHEEL HingeJoint {
@@ -901,8 +895,6 @@ DEF ROBOT_1 Robot {
         boundingObject USE BOUNDING_WHEEL
         physics Physics {
         }
-        linearVelocity -5.372593489216469e-10 3.8623689848436735e-10 4.1702999515913014e-08
-        angularVelocity -4.656854805795105e-10 8.762587930494814e-11 5.646526563120762e-10
       }
     }
   ]

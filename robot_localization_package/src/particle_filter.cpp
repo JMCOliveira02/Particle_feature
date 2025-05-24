@@ -107,7 +107,8 @@ ParticleFilter::ParticleFilter() : Node("particle_filter"),
 
     // Create publishers for the estimated pose and particles
     pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("/estimated_pose", 10);
-    particles_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("/particles", 10);
+    particles_color_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("/particles_color", 10);
+    particles_no_color_pub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("/particles__no_color", 10);
 
     // Create a transform broadcaster
     tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
@@ -286,7 +287,7 @@ std::vector<double> ParticleFilter::colorFromWeight(double weight) const
 }
 
 // publish the particles for visualization as markers
-void ParticleFilter::publishParticles()
+void ParticleFilter::publishParticles_with_color()
 {
     if (particles_.empty())
         return;
@@ -310,10 +311,7 @@ void ParticleFilter::publishParticles()
 
         tf2::Quaternion q;
         q.setRPY(0, 0, p.theta);
-        marker.pose.orientation.x = q.x();
-        marker.pose.orientation.y = q.y();
-        marker.pose.orientation.z = q.z();
-        marker.pose.orientation.w = q.w();
+        marker.pose.orientation = tf2::toMsg(q);
 
         marker.scale.x = 0.07;
         marker.scale.y = 0.005;
@@ -328,7 +326,33 @@ void ParticleFilter::publishParticles()
         marker_array.markers.push_back(marker);
     }
 
-    particles_pub_->publish(marker_array);
+    particles_color_pub_->publish(marker_array);
+}
+
+void ParticleFilter::publishParticles_no_color()
+{
+    if (particles_.empty())
+        return;
+
+    geometry_msgs::msg::PoseArray pose_array;
+
+    pose_array.header.frame_id = "map";
+    pose_array.header.stamp = this->get_clock()->now();
+    
+    for (const auto &p : particles_)
+    {
+        geometry_msgs::msg::Pose pose;
+        pose.position.x = p.x;
+        pose.position.y = p.y;
+        pose.position.z = 0.0;
+    
+        tf2::Quaternion q;
+        q.setRPY(0, 0, p.theta);
+        pose.orientation = tf2::toMsg(q);
+    
+        pose_array.poses.push_back(pose);
+    }
+    particles_no_color_pub_->publish(pose_array);
 }
 
 // replace the worst particles with random ones in white part of pgm (free space)
@@ -565,91 +589,6 @@ ParticleFilter::DecodedMsg ParticleFilter::decodeMsg(const robot_msgs::msg::Feat
 
 #pragma region resampling functions
 
-void ParticleFilter::multinomialResample()
-{
-    std::vector<Particle> new_particles;
-    new_particles.reserve(num_particles_);
-
-    std::vector<double> cumulative_weights(num_particles_);
-    cumulative_weights[0] = particles_[0].weight;
-    for (size_t i = 1; i < num_particles_; i++)
-    {
-        cumulative_weights[i] = cumulative_weights[i - 1] + particles_[i].weight;
-    }
-
-    std::uniform_real_distribution<double> dist(0.0, cumulative_weights.back());
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-    generator_.seed(seed);
-
-    for (size_t i = 0; i < num_particles_; i++)
-    {
-        double r = dist(generator_);
-        auto it = std::lower_bound(cumulative_weights.begin(), cumulative_weights.end(), r);
-        int index = std::distance(cumulative_weights.begin(), it);
-        new_particles.push_back(particles_[index]);
-    }
-
-    particles_ = new_particles;
-}
-
-void ParticleFilter::stratifiedResample()
-{
-    std::vector<Particle> new_particles;
-    new_particles.reserve(num_particles_);
-
-    std::vector<double> cumulative_weights(num_particles_);
-    cumulative_weights[0] = particles_[0].weight;
-    for (size_t i = 1; i < num_particles_; i++)
-    {
-        cumulative_weights[i] = cumulative_weights[i - 1] + particles_[i].weight;
-    }
-
-    std::uniform_real_distribution<double> dist(0.0, 1.0 / num_particles_);
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-    generator_.seed(seed);
-
-    int index = 0;
-    for (size_t i = 0; i < num_particles_; i++)
-    {
-        double r = dist(generator_); // Generate new random variable for each particle
-        double U = r + (i / static_cast<double>(num_particles_));
-        while (U > cumulative_weights[index])
-            index++;
-        new_particles.push_back(particles_[index]);
-    }
-
-    particles_ = new_particles;
-}
-
-void ParticleFilter::systematicResample()
-{
-    std::vector<Particle> new_particles;
-    new_particles.reserve(num_particles_);
-
-    // Compute cumulative weights
-    std::vector<double> cumulative_weights(num_particles_);
-    cumulative_weights[0] = particles_[0].weight;
-    for (size_t i = 1; i < num_particles_; i++)
-    {
-        cumulative_weights[i] = cumulative_weights[i - 1] + particles_[i].weight;
-    }
-
-    std::uniform_real_distribution<double> dist(0.0, 1.0 / num_particles_);
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-    generator_.seed(seed);
-    double r = dist(generator_);
-    int index = 0;
-    for (size_t i = 0; i < num_particles_; i++)
-    {
-        double U = r + (i / static_cast<double>(num_particles_));
-        while (U > cumulative_weights[index])
-            index++;
-        new_particles.push_back(particles_[index]);
-    }
-
-    particles_ = new_particles;
-}
-
 void ParticleFilter::residualResample()
 {
     std::vector<Particle> new_particles;
@@ -817,8 +756,12 @@ void ParticleFilter::motionUpdate(const nav_msgs::msg::Odometry::SharedPtr msg)
         // Save the timestamp of this motion update
         last_motion_update_timestamp_ = this->get_clock()->now();
     }
-
-    publishParticles();
+    if(with_color_){
+        publishParticles_with_color();
+    }   
+    else{
+        publishParticles_no_color();
+    }
 }
 
 void ParticleFilter::measurementUpdate(const robot_msgs::msg::FeatureArray::SharedPtr msg)
@@ -951,15 +894,6 @@ void ParticleFilter::resampleParticles(ResamplingAmount type, ResamplingMethod m
     // Perform resampling based on the specified method
     switch (method)
     {
-    case ResamplingMethod::MULTINOMIAL:
-        multinomialResample();
-        break;
-    case ResamplingMethod::STRATIFIED:
-        stratifiedResample();
-        break;
-    case ResamplingMethod::SYSTEMATIC:
-        systematicResample();
-        break;
     case ResamplingMethod::RESIDUAL:
         residualResample();
         break;

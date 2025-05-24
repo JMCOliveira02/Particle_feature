@@ -148,7 +148,9 @@ private:
 
     // ROS2 publishers, subscribers, and timers
     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pose_pub_;
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr particles_pub_;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr particles_color_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr particles_no_color_pub_;
+
     rclcpp::Subscription<robot_msgs::msg::FeatureArray>::SharedPtr feature_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::TimerBase::SharedPtr timer_pose_;
@@ -168,6 +170,7 @@ private:
     double iterationCounter = 0.0;
     bool first_update_ = true;
     bool with_angle_ = true;
+    bool with_color_ = false;
 
     // Last estimated pose
     double last_x_ = 0.0, last_y_ = 0.0, last_theta_ = 0.0;
@@ -195,9 +198,6 @@ private:
     void resampleParticles(ResamplingAmount type, ResamplingMethod method);
 
     // Resampling methods
-    void multinomialResample();
-    void stratifiedResample();
-    void systematicResample();
     void residualResample();
 
     // Particle management
@@ -211,7 +211,8 @@ private:
     void publishEstimatedPose();
 
     // Particle handling
-    void publishParticles();
+    void publishParticles_with_color();
+    void publishParticles_no_color();
 
     // Feature handling
     void storeMapMessage(const robot_msgs::msg::FeatureArray::SharedPtr msg);
